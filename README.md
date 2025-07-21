@@ -1,6 +1,6 @@
 # rust-analyzer rustc wrapper bug
 
-There is a cache invalidation bug caused by a combination of rust-analyzer's rustc wrapper and Cargo.
+There is a cache invalidation bug caused by a combination of rust-analyzer's rustc wrapper and Cargo -- filed as [rust-lang/rust-analyzer#20275](https://github.com/rust-lang/rust-analyzer/issues/20275).
 
 Tested against rust-analyzer at `9a1ee18e4dccc29c41d5c642860e58641d5ed0de` and Cargo 1.88.
 
@@ -86,13 +86,13 @@ Now, when rust-analyzer's `RUSTC_WRAPPER` is invoked with a check build:
 
 * The wrapper [skips over](https://github.com/rust-lang/rust-analyzer/blame/9a1ee18e4dccc29c41d5c642860e58641d5ed0de/crates/rust-analyzer/src/bin/rustc_wrapper.rs#L41-L43) the build and exits with code 0
 * Cargo is unaware of this skip and believes the build is successful
-* Cargo looks for the `.d` file output by rustc
+* Cargo [looks for](https://github.com/rust-lang/cargo/blob/5b295b77ee4379dec14242ead7b75c84ec4e9f75/src/cargo/core/compiler/mod.rs#L470-L491) the `.d` file output by rustc
 * Cargo finds the file produced by the first `cargo check` run -- a file that is now outdated, but Cargo isn't aware of this
-* Cargo updates its fingerprint file
+* Cargo updates its fingerprint file, including the mtime of the file.
 
 As a result, the actual `.rmeta` output isn't up-to-date, but Cargo thinks it's up-to-date
 
 ## Possible solutions
 
-* The rust-analyzer rustc wrapper could delete the `.d` file as part of skipping the build. The path to the `.d` file can be constructed through a combination of `--out-dir`, `--crate-name`, `--crate-type`, and `-C metadata`.
-* Cargo could somehow be made aware that the build didn't happen.
+* The rust-analyzer rustc wrapper could delete the `.d` file as part of skipping the build. The path to the `.d` file can be constructed through a combination of `--out-dir`, `--crate-name`, and `-C metadata`. If the `.d` file is missing, Cargo does not update its fingerprint file.
+* Cargo could somehow be made aware that the build didn't actually happen.
